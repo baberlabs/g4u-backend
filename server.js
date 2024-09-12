@@ -70,7 +70,9 @@ app.post(
 
         try {
             await transporter.sendMail(mailOptions);
-            res.redirect("/thank-you-for-getting-in-touch-with-us.html");
+            res.redirect(
+                "https://grants4you.org/thank-you-for-getting-in-touch-with-us.html"
+            );
         } catch (error) {
             console.error("Failed to send email:", error);
             return res.status(500).send("Error submitting form");
@@ -98,7 +100,6 @@ app.post(
             "email-address": email,
             "right-to-work": right,
         } = req.body;
-        const contactEmail = "contact@grants4you.org";
 
         let transporter = nodemailer.createTransport({
             service: "gmail",
@@ -124,7 +125,7 @@ app.post(
 
         try {
             await transporter.sendMail(mailOptions);
-            res.redirect("/thank-you-for-applying.html");
+            res.redirect("https://grants4you.org/thank-you-for-applying.html");
         } catch (error) {
             console.error("Failed to send email:", error);
             return res.status(500).send("Error submitting form");
