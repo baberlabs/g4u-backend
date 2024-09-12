@@ -18,6 +18,9 @@ const limiter = rateLimit({
     max: 100,
 });
 
+const contactEmail = process.env.EMAIL;
+const contactPassword = process.env.PASSWORD;
+
 app.use("/submit-form", limiter);
 
 app.post(
@@ -42,15 +45,12 @@ app.post(
             subject,
             message,
         } = req.body;
-        const contactEmail = "contact@grants4you.org";
 
         let transporter = nodemailer.createTransport({
-            host: "smtp.hostinger.com",
-            port: 465,
-            secure: true,
+            service: "gmail",
             auth: {
                 user: contactEmail,
-                pass: process.env.PASSWORD,
+                pass: contactPassword,
             },
         });
 
@@ -101,12 +101,10 @@ app.post(
         const contactEmail = "contact@grants4you.org";
 
         let transporter = nodemailer.createTransport({
-            host: "smtp.hostinger.com",
-            port: 465,
-            secure: true,
+            service: "gmail",
             auth: {
                 user: contactEmail,
-                pass: process.env.PASSWORD,
+                pass: contactPassword,
             },
         });
 
