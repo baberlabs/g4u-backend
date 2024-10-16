@@ -47,10 +47,16 @@ app.post(
         } = req.body;
 
         let transporter = nodemailer.createTransport({
-            service: "gmail",
+            host: "smtp.office365.com",
+            port: 587,
+            secure: false,
             auth: {
                 user: contactEmail,
                 pass: contactPassword,
+            },
+            tls: {
+                ciphers: "SSLv3",
+                rejectUnauthorized: false,
             },
         });
 
@@ -102,10 +108,16 @@ app.post(
         } = req.body;
 
         let transporter = nodemailer.createTransport({
-            service: "gmail",
+            host: "smtp.office365.com",
+            port: 587,
+            secure: false,
             auth: {
                 user: contactEmail,
                 pass: contactPassword,
+            },
+            tls: {
+                ciphers: "SSLv3",
+                rejectUnauthorized: false,
             },
         });
 
