@@ -3,8 +3,8 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const csrf = require("csurf");
 const morgan = require("morgan");
+const cors = require("cors");
 const { body, validationResult } = require("express-validator");
 const { Client } = require("@microsoft/microsoft-graph-client");
 const { ClientSecretCredential } = require("@azure/identity");
@@ -13,13 +13,43 @@ require("isomorphic-fetch");
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.set("trust proxy", 1);
+const allowedDomains = [
+    "https://grants4you.org",
+    "https://www.grants4you.org",
+    "https://g4u.info",
+    "https://www.g4u.info",
+    "https://grantsforyoumarketing.co.uk",
+    "https://www.grantsforyoumarketing.co.uk",
+];
 
+// CORS middleware that dynamically checks allowed domains
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (allowedDomains.includes(origin) || !origin) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
+
+// Redirect HTTP to HTTPS for all domains
 app.use((req, res, next) => {
     if (req.secure || req.headers["x-forwarded-proto"] === "https") {
         next();
     } else {
-        res.redirect("https://" + req.headers.host + req.url);
+        const host = req.headers.host;
+        if (
+            allowedDomains.some((domain) =>
+                host.includes(domain.replace("https://", ""))
+            )
+        ) {
+            res.redirect("https://" + host + req.url);
+        } else {
+            res.status(403).send("Access Forbidden");
+        }
     }
 });
 
@@ -39,17 +69,6 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-
-app.use(
-    csrf({
-        cookie: {
-            secure: true,
-            httpOnly: true,
-            sameSite: "strict",
-        },
-    })
-);
-
 app.use(morgan("combined"));
 
 const limiter = rateLimit({
@@ -105,13 +124,10 @@ const commonValidationRules = [
         .withMessage("Valid email is required"),
 ];
 
-app.get("/csrf-token", (req, res) => {
-    res.json({ csrfToken: req.csrfToken() });
-});
-
 app.post(
     "/submit-form",
     [
+        // No CSRF protection applied here
         ...commonValidationRules,
         body("subject")
             .trim()
@@ -164,6 +180,7 @@ app.post(
 app.post(
     "/work-application",
     [
+        // No CSRF protection applied here
         ...commonValidationRules,
         body("right-to-work")
             .trim()
