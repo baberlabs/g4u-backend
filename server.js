@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const csrf = require("csurf");
@@ -37,6 +38,8 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+
 app.use(
     csrf({
         cookie: {
@@ -46,6 +49,7 @@ app.use(
         },
     })
 );
+
 app.use(morgan("combined"));
 
 const limiter = rateLimit({
@@ -100,6 +104,10 @@ const commonValidationRules = [
         .normalizeEmail()
         .withMessage("Valid email is required"),
 ];
+
+app.get("/csrf-token", (req, res) => {
+    res.json({ csrfToken: req.csrfToken() });
+});
 
 app.post(
     "/submit-form",
@@ -231,5 +239,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(port, () => {
-    console.log(`Server listening at http://localhost:${port}`);
+    console.log(`Server listening at https://localhost:${port}`);
 });
