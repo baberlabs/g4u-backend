@@ -1,15 +1,16 @@
 require("dotenv").config();
 const express = require("express");
-const nodemailer = require("nodemailer");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const { body, validationResult } = require("express-validator");
+const { Client } = require("@microsoft/microsoft-graph-client");
+const { ClientSecretCredential } = require("@azure/identity");
+require("isomorphic-fetch");
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3020;
 
 app.use(helmet());
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -17,9 +18,6 @@ const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
 });
-
-const contactEmail = process.env.EMAIL;
-const contactPassword = process.env.PASSWORD;
 
 app.use("/submit-form", limiter);
 
@@ -46,36 +44,19 @@ app.post(
             message,
         } = req.body;
 
-        let transporter = nodemailer.createTransport({
-            host: "smtp-legacy.office365.com",
-            port: 587,
-            secure: false,
-            auth: {
-                user: contactEmail,
-                pass: contactPassword,
-            },
-            tls: {
-                ciphers: "SSLv3",
-                rejectUnauthorized: false,
-            },
-        });
-
-        let mailOptions = {
-            from: contactEmail,
-            to: contactEmail,
-            subject: `Form Submission: ${subject}`,
-            html: `
-      <div style="font-family: Arial, sans-serif; color: #333;">
-        <h2 style="color: #007bff;">New Contact Form Submission</h2>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Phone:</strong> ${phone}</p>
-        <p><strong>Email:</strong> <a href="mailto:${email}" style="color: #007bff;">${email}</a></p>
-        <p><strong>Message:</strong> ${message}</p>
-      </div>`,
-        };
-
         try {
-            await transporter.sendMail(mailOptions);
+            await sendGraphEmail({
+                subject: `Form Submission: ${subject}`,
+                toEmail: process.env.EMAIL,
+                body: `
+                <div style="font-family: Arial, sans-serif; color: #333;">
+                    <h2 style="color: #007bff;">New Contact Form Submission</h2>
+                    <p><strong>Name:</strong> ${name}</p>
+                    <p><strong>Phone:</strong> ${phone}</p>
+                    <p><strong>Email:</strong> <a href="mailto:${email}" style="color: #007bff;">${email}</a></p>
+                    <p><strong>Message:</strong> ${message}</p>
+                </div>`,
+            });
             res.redirect(
                 "https://grants4you.org/thank-you-for-getting-in-touch-with-us.html"
             );
@@ -107,36 +88,19 @@ app.post(
             "right-to-work": right,
         } = req.body;
 
-        let transporter = nodemailer.createTransport({
-            host: "smtp-legacy.office365.com",
-            port: 587,
-            secure: false,
-            auth: {
-                user: contactEmail,
-                pass: contactPassword,
-            },
-            tls: {
-                ciphers: "SSLv3",
-                rejectUnauthorized: false,
-            },
-        });
-
-        let mailOptions = {
-            from: contactEmail,
-            to: contactEmail,
-            subject: `Work Application: ${name}`,
-            html: `
-        <div style="font-family: Arial, sans-serif; color: #333;">
-          <h2 style="color: #007bff;">New Work Application</h2>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Phone:</strong> ${phone}</p>
-          <p><strong>Email:</strong> <a href="mailto:${email}" style="color: #007bff;">${email}</a></p>
-          <p><strong>Right to Work:</strong> ${right}</p>
-        </div>`,
-        };
-
         try {
-            await transporter.sendMail(mailOptions);
+            await sendGraphEmail({
+                subject: `Work Application: ${name}`,
+                toEmail: process.env.EMAIL,
+                body: `
+                <div style="font-family: Arial, sans-serif; color: #333;">
+                    <h2 style="color: #007bff;">New Work Application</h2>
+                    <p><strong>Name:</strong> ${name}</p>
+                    <p><strong>Phone:</strong> ${phone}</p>
+                    <p><strong>Email:</strong> <a href="mailto:${email}" style="color: #007bff;">${email}</a></p>
+                    <p><strong>Right to Work:</strong> ${right}</p>
+                </div>`,
+            });
             res.redirect("https://grants4you.org/thank-you-for-applying.html");
         } catch (error) {
             console.error("Failed to send email:", error);
@@ -148,3 +112,43 @@ app.post(
 app.listen(port, () => {
     console.log(`Server listening at http://localhost:${port}`);
 });
+
+async function sendGraphEmail({ subject, toEmail, body }) {
+    const credential = new ClientSecretCredential(
+        process.env.TENANT_ID,
+        process.env.CLIENT_ID,
+        process.env.CLIENT_SECRET
+    );
+
+    const client = Client.initWithMiddleware({
+        authProvider: {
+            getAccessToken: async () => {
+                const token = await credential.getToken(
+                    "https://graph.microsoft.com/.default"
+                );
+                return token.token;
+            },
+        },
+    });
+
+    const email = {
+        message: {
+            subject: subject,
+            body: {
+                contentType: "HTML",
+                content: body,
+            },
+            toRecipients: [
+                {
+                    emailAddress: {
+                        address: toEmail,
+                    },
+                },
+            ],
+        },
+    };
+
+    await client
+        .api("/users/" + process.env.EMAIL + "/sendMail")
+        .post({ message: email.message });
+}
